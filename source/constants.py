@@ -275,6 +275,12 @@ PLANT_CARD_INFO = (  # 元组 (植物名称, 卡片名称, 阳光, 冷却时间)
         100,
         7500,
     ),
+    (
+        QIN_CROSSBOW_SHOOTER := 'QinCrossbowShooter',
+        CARD_QIN_CROSSBOW_SHOOTER := 'card_qincrossbowshooter',
+        125,
+        7500,
+    ),
     (SUNFLOWER := 'SunFlower', CARD_SUNFLOWER := 'card_sunflower', 50, 7500),
     (
         CHERRYBOMB := 'CherryBomb',
@@ -509,6 +515,8 @@ ICETRAP = 'IceTrap'
 BULLET_PEA = 'PeaNormal'
 BULLET_PEA_ICE = 'PeaIce'
 BULLET_FIREBALL = 'Fireball'
+BULLET_CROSSBOW_NORMAL = 'CrossbowNormal'
+BULLET_CROSSBOW_FIRE = 'CrossbowFire'
 BULLET_MUSHROOM = 'BulletMushRoom'
 BULLET_SEASHROOM = 'BulletSeaShroom'
 FUME = 'Fume'
@@ -516,6 +524,10 @@ FUME = 'Fume'
 BULLET_DAMAGE_NORMAL = 20
 BULLET_DAMAGE_FIREBALL_BODY = 27   # 这是火球本体的伤害，注意不是40，本体(27) + 溅射(13)才是40
 BULLET_DAMAGE_FIREBALL_RANGE = 13   # 原版溅射伤害会随着僵尸数量增多而减少，这里相当于做了一个增强
+# 秦弩射手伤害（相对豌豆加强）
+BULLET_DAMAGE_CROSSBOW_NORMAL = 30   # 普通豌豆(20)的1.5倍
+BULLET_DAMAGE_CROSSBOW_FIRE_BODY = 54   # 火豌豆本体(27)的2倍
+BULLET_DAMAGE_CROSSBOW_FIRE_RANGE = 26   # 火豌豆溅射(13)的2倍
 # 子弹效果
 BULLET_EFFECT_ICE = 'ice'
 BULLET_EFFECT_UNICE = 'unice'
@@ -535,6 +547,8 @@ STAR_DOWNWARD = 'downward'  # 向下
 BULLET_INDEPENDENT_BOOM_IMG = {
     BULLET_PEA,
     BULLET_PEA_ICE,
+    BULLET_CROSSBOW_NORMAL,
+    BULLET_CROSSBOW_FIRE,
     BULLET_MUSHROOM,
     BULLET_SEASHROOM,
     BULLET_STAR,
@@ -650,6 +664,8 @@ PLAY = 'play'
 PLANT_RECT = {
     BULLET_PEA: {'x': 28, 'y': 0, 'width': 28, 'height': 34},
     BULLET_PEA_ICE: {'x': 26, 'y': 0, 'width': 30, 'height': 34},
+    BULLET_CROSSBOW_NORMAL: {'x': 0, 'y': 0, 'width': 56, 'height': 34},
+    BULLET_CROSSBOW_FIRE: {'x': 0, 'y': 0, 'width': 56, 'height': 34},
     CHOMPER: {'x': 0, 'y': 0, 'width': 100, 'height': 114},
     PUFFSHROOM: {'x': 0, 'y': 28, 'width': 35, 'height': 38},
     f'{PUFFSHROOM}Sleep': {'x': 1, 'y': 0, 'width': 39, 'height': 65},

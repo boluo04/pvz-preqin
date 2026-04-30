@@ -79,6 +79,7 @@ class Bullet(pg.sprite.Sprite):
 
     def loadFrames(self, frames, name):
         frame_list = tool.GFX[name]
+        scale = 1
         if name in c.PLANT_RECT:
             data = c.PLANT_RECT[name]
             x, y, width, height = (
@@ -92,8 +93,11 @@ class Bullet(pg.sprite.Sprite):
             rect = frame_list[0].get_rect()
             width, height = rect.w, rect.h
 
+        if name in {c.BULLET_CROSSBOW_NORMAL, c.BULLET_CROSSBOW_FIRE}:
+            scale = 1.5
+
         for frame in frame_list:
-            frames.append(tool.get_image(frame, x, y, width, height))
+            frames.append(tool.get_image(frame, x, y, width, height, scale=scale))
 
     def load_images(self):
         self.fly_frames = []
@@ -510,6 +514,55 @@ class PeaShooter(Plant):
         self.state = c.ATTACK
         if self.shoot_timer != 0:
             self.shoot_timer = self.current_time - 700
+
+
+class QinCrossbowShooter(Plant):
+    def __init__(self, x, y, bullet_group):
+        Plant.__init__(
+            self,
+            x,
+            y,
+            c.QIN_CROSSBOW_SHOOTER,
+            c.PLANT_HEALTH,
+            bullet_group,
+            scale=0.14,
+        )
+        self.shoot_timer = 0
+
+    def loadImages(self, name, scale):
+        self.idle_frames = []
+        self.attack_frames = []
+
+        self.loadFrames(self.idle_frames, name, scale)
+        self.loadFrames(self.attack_frames, f'{name}Attack', scale)
+
+        self.frames = self.idle_frames
+
+    def setAttack(self):
+        self.state = c.ATTACK
+        if self.shoot_timer != 0:
+            self.shoot_timer = self.current_time - 700
+
+    def setIdle(self):
+        self.state = c.IDLE
+        self.is_attacked = False
+
+    def attacking(self):
+        if self.shoot_timer == 0:
+            self.shoot_timer = self.current_time - 700
+        elif (self.current_time - self.shoot_timer) >= 1400:
+            self.bullet_group.add(
+                Bullet(
+                    self.rect.right - 15,
+                    self.rect.y,
+                    self.rect.y,
+                    c.BULLET_CROSSBOW_NORMAL,
+                    c.BULLET_DAMAGE_CROSSBOW_NORMAL,
+                    effect=None,
+                )
+            )
+            self.shoot_timer = self.current_time
+            c.SOUND_SHOOT.play()
 
 
 class RepeaterPea(Plant):
@@ -1515,6 +1568,23 @@ class TorchWood(Plant):
                         c.BULLET_PEA,
                         c.BULLET_DAMAGE_NORMAL,
                         effect=None,
+                        passed_torchwood_x=self.rect.centerx,
+                    )
+                )
+                i.kill()
+            elif (
+                i.name == c.BULLET_CROSSBOW_NORMAL
+                and i.passed_torchwood_x != self.rect.centerx
+                and abs(i.rect.centerx - self.rect.centerx) <= 20
+            ):
+                self.bullet_group.add(
+                    Bullet(
+                        i.rect.x,
+                        i.rect.y,
+                        i.dest_y,
+                        c.BULLET_CROSSBOW_FIRE,
+                        c.BULLET_DAMAGE_CROSSBOW_FIRE_BODY,
+                        effect=c.BULLET_EFFECT_UNICE,
                         passed_torchwood_x=self.rect.centerx,
                     )
                 )

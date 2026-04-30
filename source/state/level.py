@@ -1171,6 +1171,10 @@ class Level(tool.State):
                 new_plant = plant.SunFlower(x, y, self.sun_group)
             case c.PEASHOOTER:
                 new_plant = plant.PeaShooter(x, y, self.bullet_groups[map_y])
+            case c.QIN_CROSSBOW_SHOOTER:
+                new_plant = plant.QinCrossbowShooter(
+                    x, y, self.bullet_groups[map_y]
+                )
             case c.SNOWPEASHOOTER:
                 new_plant = plant.SnowPeaShooter(
                     x, y, self.bullet_groups[map_y]
@@ -1323,6 +1327,7 @@ class Level(tool.State):
 
     def setupMouseImage(self, plant_name, select_plant, colorkey=c.BLACK):
         frame_list = tool.GFX[plant_name]
+        scale = 1
         if plant_name in c.PLANT_RECT:
             data = c.PLANT_RECT[plant_name]
             x, y, width, height = (
@@ -1336,8 +1341,11 @@ class Level(tool.State):
             rect = frame_list[0].get_rect()
             width, height = rect.w, rect.h
 
+        if plant_name == c.QIN_CROSSBOW_SHOOTER:
+            scale = 0.14
+
         self.mouse_image = tool.get_image(
-            frame_list[0], x, y, width, height, colorkey, 1
+            frame_list[0], x, y, width, height, colorkey, scale
         )
         self.mouse_rect = self.mouse_image.get_rect()
         self.drag_plant = True
@@ -1378,13 +1386,24 @@ class Level(tool.State):
                                 )
                                 bullet.setExplode()
                                 # 火球有溅射伤害
-                                if bullet.name == c.BULLET_FIREBALL:
+                                if bullet.name in {
+                                    c.BULLET_FIREBALL,
+                                    c.BULLET_CROSSBOW_FIRE,
+                                }:
+                                    if bullet.name == c.BULLET_FIREBALL:
+                                        splash_damage = (
+                                            c.BULLET_DAMAGE_FIREBALL_RANGE
+                                        )
+                                    else:
+                                        splash_damage = (
+                                            c.BULLET_DAMAGE_CROSSBOW_FIRE_RANGE
+                                        )
                                     for rangeZombie in self.zombie_groups[i]:
                                         if abs(
                                             rangeZombie.rect.x - bullet.rect.x
                                         ) <= (c.GRID_X_SIZE // 2):
                                             rangeZombie.setDamage(
-                                                c.BULLET_DAMAGE_FIREBALL_RANGE,
+                                                splash_damage,
                                                 effect=None,
                                                 damage_type=c.ZOMBIE_DEAFULT_DAMAGE,
                                             )
