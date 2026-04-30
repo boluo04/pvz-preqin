@@ -283,6 +283,12 @@ PLANT_CARD_INFO = (  # 元组 (植物名称, 卡片名称, 阳光, 冷却时间)
     ),
     (SUNFLOWER := 'SunFlower', CARD_SUNFLOWER := 'card_sunflower', 50, 7500),
     (
+        LIYUE_SUNFLOWER := 'LiYueSunFlower',
+        CARD_LIYUE_SUNFLOWER := 'card_liyuesunflower',
+        75,
+        7500,
+    ),
+    (
         CHERRYBOMB := 'CherryBomb',
         CARD_CHERRYBOMB := 'card_cherrybomb',
         150,

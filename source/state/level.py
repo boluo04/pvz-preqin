@@ -474,7 +474,7 @@ class Level(tool.State):
         self.state = c.CHOOSE
         self.panel = menubar.Panel(
             c.CARDS_TO_CHOOSE,
-            self.map_data[c.INIT_SUN_NAME],
+            1000,
             self.background_type,
         )
 
@@ -510,9 +510,7 @@ class Level(tool.State):
 
         self.state = c.PLAY
         if self.bar_type == c.CHOOSEBAR_STATIC:
-            self.menubar = menubar.MenuBar(
-                card_list, self.map_data[c.INIT_SUN_NAME]
-            )
+            self.menubar = menubar.MenuBar(card_list, 1000)
         else:
             self.menubar = menubar.MoveBar(card_list)
 
@@ -721,14 +719,14 @@ class Level(tool.State):
                 c.SOUND_BUTTON_CLICK.play()
             # 重新开始键
             elif self.inArea(self.restart_button_rect, *mouse_pos):
-                self._leavePauseMenu()
+                self._leavePauseMenu(unpause_music=False)
                 self.done = True
                 self.next = c.LEVEL
                 # 播放点击音效
                 c.SOUND_BUTTON_CLICK.play()
             # 主菜单键
             elif self.inArea(self.mainMenu_button_rect, *mouse_pos):
-                self._leavePauseMenu()
+                self._leavePauseMenu(unpause_music=False)
                 self.done = True
                 self.next = c.MAIN_MENU
                 self.persist = self.game_info
@@ -759,11 +757,12 @@ class Level(tool.State):
                 # 将音量信息存档
                 self.saveUserData()
 
-    def _leavePauseMenu(self):
+    def _leavePauseMenu(self, unpause_music=True):
         """Normalize pause state before transitioning to another state."""
         self.pause = False
         self.show_game_menu = False
-        pg.mixer.music.unpause()
+        if unpause_music and pg.mixer.music.get_busy():
+            pg.mixer.music.unpause()
 
     # 一大波僵尸来袭图片显示
     def setupHugeWaveApprochingImage(self):
@@ -1169,6 +1168,8 @@ class Level(tool.State):
         match self.plant_name:
             case c.SUNFLOWER:
                 new_plant = plant.SunFlower(x, y, self.sun_group)
+            case c.LIYUE_SUNFLOWER:
+                new_plant = plant.LiYueSunFlower(x, y, self.sun_group)
             case c.PEASHOOTER:
                 new_plant = plant.PeaShooter(x, y, self.bullet_groups[map_y])
             case c.QIN_CROSSBOW_SHOOTER:
@@ -1343,6 +1344,8 @@ class Level(tool.State):
 
         if plant_name == c.QIN_CROSSBOW_SHOOTER:
             scale = 0.14
+        elif plant_name == c.LIYUE_SUNFLOWER:
+            scale = 0.15
 
         self.mouse_image = tool.get_image(
             frame_list[0], x, y, width, height, colorkey, scale

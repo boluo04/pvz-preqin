@@ -487,6 +487,49 @@ class SunFlower(Plant):
             self.sun_timer = self.current_time
 
 
+class LiYueSunFlower(Plant):
+    def __init__(self, x, y, sun_group):
+        Plant.__init__(
+            self, x, y, c.LIYUE_SUNFLOWER, c.PLANT_HEALTH, None, scale=0.15
+        )
+        self.sun_timer = 0
+        self.sun_group = sun_group
+        self.attack_check = c.CHECK_ATTACK_NEVER
+
+    def idling(self):
+        if self.sun_timer == 0:
+            self.sun_timer = self.current_time - (c.FLOWER_SUN_INTERVAL - 6000)
+        elif (self.current_time - self.sun_timer) > c.FLOWER_SUN_INTERVAL:
+            self.sun_group.add(
+                Sun(
+                    self.rect.centerx,
+                    self.rect.bottom,
+                    self.rect.right - 10,
+                    self.rect.bottom + self.rect.h // 2,
+                )
+            )
+            self.sun_group.add(
+                Sun(
+                    self.rect.centerx,
+                    self.rect.bottom,
+                    self.rect.right + 10,
+                    self.rect.bottom + self.rect.h // 2,
+                )
+            )
+            self.sun_timer = self.current_time
+
+    def animation(self):
+        # 礼乐向日葵固定显示第1帧，只保留受击/高亮透明反馈
+        self.image = self.frames[0]
+        self.mask = pg.mask.from_surface(self.image)
+        if self.current_time - self.highlight_time < 100:
+            self.image.set_alpha(150)
+        elif (self.current_time - self.hit_timer) < 200:
+            self.image.set_alpha(192)
+        else:
+            self.image.set_alpha(255)
+
+
 class PeaShooter(Plant):
     def __init__(self, x, y, bullet_group):
         Plant.__init__(self, x, y, c.PEASHOOTER, c.PLANT_HEALTH, bullet_group)
@@ -563,6 +606,17 @@ class QinCrossbowShooter(Plant):
             )
             self.shoot_timer = self.current_time
             c.SOUND_SHOOT.play()
+
+    def animation(self):
+        # 秦弩射手固定显示第1帧，只保留受击/高亮透明反馈
+        self.image = self.frames[0]
+        self.mask = pg.mask.from_surface(self.image)
+        if self.current_time - self.highlight_time < 100:
+            self.image.set_alpha(150)
+        elif (self.current_time - self.hit_timer) < 200:
+            self.image.set_alpha(192)
+        else:
+            self.image.set_alpha(255)
 
 
 class RepeaterPea(Plant):
