@@ -1182,6 +1182,8 @@ class Level(tool.State):
                 )
             case c.WALLNUT:
                 new_plant = plant.WallNut(x, y)
+            case c.BINGYONG_WALLNUT:
+                new_plant = plant.BingYongWallNut(x, y)
             case c.CHERRYBOMB:
                 new_plant = plant.CherryBomb(x, y)
             case c.THREEPEASHOOTER:
@@ -1346,6 +1348,8 @@ class Level(tool.State):
             scale = 0.14
         elif plant_name == c.LIYUE_SUNFLOWER:
             scale = 0.15
+        elif plant_name == c.BINGYONG_WALLNUT:
+            scale = 0.14
 
         self.mouse_image = tool.get_image(
             frame_list[0], x, y, width, height, colorkey, scale
@@ -1698,6 +1702,25 @@ class Level(tool.State):
                     if zombie.health <= 0:
                         zombie.setBoomDie()
 
+    def boomZombiesCross(self, map_x, map_y, damage):
+        # 十字5格：自身 + 上下左右
+        targets = {
+            (map_x, map_y),
+            (map_x - 1, map_y),
+            (map_x + 1, map_y),
+            (map_x, map_y - 1),
+            (map_x, map_y + 1),
+        }
+        for i in range(self.map_y_len):
+            for zombie in self.zombie_groups[i]:
+                zombie_map_x, zombie_map_y = self.map.getMapIndex(
+                    zombie.rect.centerx, zombie.rect.bottom
+                )
+                if (zombie_map_x, zombie_map_y) in targets:
+                    zombie.setDamage(damage, damage_type=c.ZOMBIE_RANGE_DAMAGE)
+                    if zombie.health <= 0:
+                        zombie.setBoomDie()
+
     def freezeZombies(self, plant):
         # 播放冻结音效
         c.SOUND_FREEZE.play()
@@ -1712,6 +1735,14 @@ class Level(tool.State):
     def killPlant(self, target_plant, shovel=False):
         x, y = target_plant.getPosition()
         map_x, map_y = self.map.getMapIndex(x, y)
+        if not self.map.isValid(map_x, map_y):
+            # 极端情况下贴图尺寸/偏移异常，回退到当前行内碰撞位置推断格子，避免崩溃
+            map_x, map_y = self.map.getMapIndex(
+                target_plant.rect.centerx, target_plant.rect.bottom
+            )
+            if not self.map.isValid(map_x, map_y):
+                map_x = min(max(map_x, 0), self.map_x_len - 1)
+                map_y = min(max(map_y, 0), self.map_y_len - 1)
 
         # 用铲子铲不用触发植物功能
         if not shovel:
@@ -1748,6 +1779,11 @@ class Level(tool.State):
             elif target_plant.name not in c.PLANT_DIE_SOUND_EXCEPTIONS:
                 # 触发植物死亡音效
                 c.SOUND_PLANT_DIE.play()
+            if target_plant.name == c.BINGYONG_WALLNUT:
+                c.SOUND_BOMB.play()
+                self.boomZombiesCross(
+                    map_x, map_y, c.BINGYONG_WALLNUT_DEATH_DAMAGE
+                )
         else:
             # 用铲子移除植物时播放音效
             c.SOUND_PLANT.play()

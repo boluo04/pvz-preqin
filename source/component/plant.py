@@ -766,8 +766,8 @@ class WallNut(Plant):
         cracked1_frames_name = self.name + '_cracked1'
         cracked2_frames_name = self.name + '_cracked2'
 
-        self.loadFrames(self.cracked1_frames, cracked1_frames_name)
-        self.loadFrames(self.cracked2_frames, cracked2_frames_name)
+        self.loadFrames(self.cracked1_frames, cracked1_frames_name, 0.14)
+        self.loadFrames(self.cracked2_frames, cracked2_frames_name, 0.14)
 
     def idling(self):
         if (not self.cracked1) and self.health <= c.WALLNUT_CRACKED1_HEALTH:
@@ -776,6 +776,41 @@ class WallNut(Plant):
         elif (not self.cracked2) and self.health <= c.WALLNUT_CRACKED2_HEALTH:
             self.changeFrames(self.cracked2_frames)
             self.cracked2 = True
+
+
+class BingYongWallNut(Plant):
+    def __init__(self, x, y):
+        Plant.__init__(
+            self, x, y, c.BINGYONG_WALLNUT, c.BINGYONG_WALLNUT_HEALTH, None, scale=0.14
+        )
+        self.orig_pos = (x, y)
+        self.load_images()
+        self.cracked1 = False
+        self.cracked2 = False
+        self.attack_check = c.CHECK_ATTACK_NEVER
+
+    def load_images(self):
+        self.cracked1_frames = []
+        self.cracked2_frames = []
+
+        cracked1_frames_name = self.name + '_cracked1'
+        cracked2_frames_name = self.name + '_cracked2'
+
+        # 保持与本体一致的缩放比例，避免切换残损状态时贴图突然变大
+        self.loadFrames(self.cracked1_frames, cracked1_frames_name, 0.14)
+        self.loadFrames(self.cracked2_frames, cracked2_frames_name, 0.14)
+
+    def idling(self):
+        if (not self.cracked1) and self.health <= c.BINGYONG_WALLNUT_CRACKED1_HEALTH:
+            self.changeFrames(self.cracked1_frames)
+            self.cracked1 = True
+        elif (not self.cracked2) and self.health <= c.BINGYONG_WALLNUT_CRACKED2_HEALTH:
+            self.changeFrames(self.cracked2_frames)
+            self.cracked2 = True
+
+    def getPosition(self):
+        # 固定返回种植锚点，避免因换帧尺寸差异导致地图索引越界
+        return self.orig_pos
 
 
 class CherryBomb(Plant):
