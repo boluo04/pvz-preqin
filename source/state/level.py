@@ -113,6 +113,7 @@ class Level(tool.State):
     def setupGroups(self):
         self.sun_group = pg.sprite.Group()
         self.head_group = pg.sprite.Group()
+        self.tile_effect_group = pg.sprite.Group()
 
         # 改用列表生成器直接生成内容，不再在这里使用for循环
         self.plant_groups = [pg.sprite.Group() for i in range(self.map_y_len)]
@@ -884,6 +885,7 @@ class Level(tool.State):
             for zombie in self.hypno_zombie_groups[i]:
                 if zombie.rect.x > c.SCREEN_WIDTH:
                     zombie.kill()
+        self.tile_effect_group.update(self.game_info)
 
         self.head_group.update(self.game_info)
         self.sun_group.update(self.game_info)
@@ -1186,6 +1188,8 @@ class Level(tool.State):
                 new_plant = plant.BingYongWallNut(x, y)
             case c.CHERRYBOMB:
                 new_plant = plant.CherryBomb(x, y)
+            case c.BAIQI_CHERRYBOMB:
+                new_plant = plant.BaiQiCherryBomb(x, y)
             case c.THREEPEASHOOTER:
                 new_plant = plant.ThreePeaShooter(
                     x, y, self.bullet_groups, map_y, self.map.background_type
@@ -1703,7 +1707,9 @@ class Level(tool.State):
                 if self.cars[i].dead:
                     self.cars[i] = None
 
-    def boomZombies(self, x, map_y, y_range, x_range, effect=None):
+    def boomZombies(
+        self, x, map_y, y_range, x_range, effect=None, damage=1800
+    ):
         for i in range(self.map_y_len):
             if abs(i - map_y) > y_range:
                 continue
@@ -1720,7 +1726,7 @@ class Level(tool.State):
                 ]:  # 这代码不太好懂，后面是一个判断僵尸在左还是在右，前面是一个元组，[0]是在左边的情况，[1]是在右边的情况
                     if effect == c.BULLET_EFFECT_UNICE:
                         zombie.ice_slow_ratio = 1
-                    zombie.setDamage(1800, damage_type=c.ZOMBIE_ASH_DAMAGE)
+                    zombie.setDamage(damage, damage_type=c.ZOMBIE_ASH_DAMAGE)
                     if zombie.health <= 0:
                         zombie.setBoomDie()
 
@@ -1774,6 +1780,38 @@ class Level(tool.State):
                 )
                 if (zombie_map_x, zombie_map_y) in targets:
                     zombie.setFreezePause(ice_trap, duration_ms)
+
+        # 地块特效：冻结九宫格（默认显示 1 秒）
+        effect_img = tool.GFX.get('LuoWangFreezeEffect')
+        if effect_img:
+            # 缩放到当前的 0.7 倍，并略微上移以贴近地块中心
+            w, h = effect_img.get_size()
+            effect_img = pg.transform.smoothscale(
+                effect_img, (int(w * 0.7), int(h * 0.7))
+            )
+            for tx, ty in targets:
+                if not self.map.isValid(tx, ty):
+                    continue
+                cx, cy = self.map.getMapGridPos(tx, ty)
+                self.tile_effect_group.add(
+                    plant.TileEffect(cx, cy - 10, effect_img, 500)
+                )
+
+    def showBaiQiBombTileEffect(self, map_x, map_y, y_range):
+        effect_img = tool.GFX.get('BaiQiBombEffect')
+        if not effect_img:
+            return
+        # 固定 3x5：自身列左右各 1 列，上下各 2 行
+        for ty in range(self.map_y_len):
+            if abs(ty - map_y) > y_range:
+                continue
+            for tx in (map_x - 1, map_x, map_x + 1):
+                if not self.map.isValid(tx, ty):
+                    continue
+                cx, cy = self.map.getMapGridPos(tx, ty)
+                self.tile_effect_group.add(
+                    plant.TileEffect(cx, cy, effect_img, 700)
+                )
 
     def killPlant(self, target_plant, shovel=False):
         x, y = target_plant.getPosition()
@@ -1953,12 +1991,24 @@ class Level(tool.State):
         elif target_plant.name in c.ASH_PLANTS_AND_ICESHROOM:
             if target_plant.start_boom and (not target_plant.boomed):
                 # 这样分成两层是因为场上灰烬植物肯定少，一个一个判断代价高，先笼统判断灰烬即可
-                if target_plant.name in {c.REDWALLNUTBOWLING, c.CHERRYBOMB}:
+                if target_plant.name in {
+                    c.REDWALLNUTBOWLING,
+                    c.CHERRYBOMB,
+                    c.BAIQI_CHERRYBOMB,
+                }:
+                    if target_plant.name == c.BAIQI_CHERRYBOMB:
+                        plant_map_x, _ = self.map.getMapIndex(
+                            target_plant.rect.centerx, target_plant.rect.bottom
+                        )
+                        self.showBaiQiBombTileEffect(
+                            plant_map_x, i, target_plant.explode_y_range
+                        )
                     self.boomZombies(
                         target_plant.rect.centerx,
                         i,
                         target_plant.explode_y_range,
                         target_plant.explode_x_range,
+                        damage=getattr(target_plant, 'damage', 1800),
                     )
                 elif target_plant.name == c.DOOMSHROOM:
                     x, y = target_plant.original_x, target_plant.original_y
@@ -2226,6 +2276,8 @@ class Level(tool.State):
                 self.drawZombieFreezeTrap(i, surface)
                 if self.cars[i]:
                     self.cars[i].draw(surface)
+            # 地块特效层（冻九宫格 / 白起范围标记）
+            self.tile_effect_group.draw(surface)
             self.head_group.draw(surface)
             self.sun_group.draw(surface)
 

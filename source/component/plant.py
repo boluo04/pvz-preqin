@@ -38,6 +38,23 @@ class Car(pg.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 
+class TileEffect(pg.sprite.Sprite):
+    def __init__(self, x: int, y: int, image: pg.Surface, duration_ms: int):
+        pg.sprite.Sprite.__init__(self)
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.duration_ms = duration_ms
+        self.start_time = 0
+
+    def update(self, game_info: dict):
+        current_time = game_info[c.CURRENT_TIME]
+        if self.start_time == 0:
+            self.start_time = current_time
+        elif current_time - self.start_time >= self.duration_ms:
+            self.kill()
+
+
 # 豌豆及孢子类普通子弹
 class Bullet(pg.sprite.Sprite):
     def __init__(
@@ -862,6 +879,67 @@ class CherryBomb(Plant):
             self.image = self.frames[self.frame_index]
             self.mask = pg.mask.from_surface(self.image)
 
+        if self.current_time - self.highlight_time < 100:
+            self.image.set_alpha(150)
+        elif (self.current_time - self.hit_timer) < 200:
+            self.image.set_alpha(192)
+        else:
+            self.image.set_alpha(255)
+
+
+class BaiQiCherryBomb(CherryBomb):
+    def __init__(self, x, y):
+        Plant.__init__(self, x, y, c.BAIQI_CHERRYBOMB, c.INF, None)
+        self.state = c.ATTACK
+        self.start_boom = False
+        self.boomed = False
+        self.bomb_timer = 0
+        # 大杀器范围：纵向 5 行（上下各 2 行），横向 3 列（自身列左右各 1 列）
+        self.explode_y_range = 2
+        self.explode_x_range = int(c.GRID_X_SIZE * 1.2)
+        self.damage = c.BAIQI_CHERRYBOMB_DAMAGE
+        self.animate_interval = 60
+
+    def loadImages(self, name, scale):
+        self.idle_frames = []
+        self.explode_frames = []
+        self.loadFrames(self.idle_frames, name)
+        # 爆炸特效强化显示：只放大爆炸帧，不影响实际伤害判定范围
+        self.loadFrames(self.explode_frames, name + 'Explode', 2.5)
+        self.frames = self.idle_frames
+
+    def setBoom(self):
+        old_rect = self.rect.copy()
+        self.changeFrames(self.explode_frames)
+        # 放大特效时保持爆心在原位置，避免“跳动”
+        self.rect.center = old_rect.center
+        self.start_boom = True
+        self.boom_anim_timer = self.current_time
+
+    def animation(self):
+        if self.start_boom:
+            if self.bomb_timer == 0:
+                self.bomb_timer = self.current_time
+                c.SOUND_BOMB.play()
+
+            if (self.current_time - self.animate_timer) > self.animate_interval:
+                self.frame_index += 1
+                if self.frame_index >= self.frame_num:
+                    self.frame_index = self.frame_num - 1
+                self.animate_timer = self.current_time
+
+            if (self.current_time - self.bomb_timer) > 900:
+                self.health = 0
+        else:
+            if (self.current_time - self.animate_timer) > 100:
+                self.frame_index += 1
+                if self.frame_index >= self.frame_num:
+                    self.setBoom()
+                    return
+                self.animate_timer = self.current_time
+
+        self.image = self.frames[self.frame_index]
+        self.mask = pg.mask.from_surface(self.image)
         if self.current_time - self.highlight_time < 100:
             self.image.set_alpha(150)
         elif (self.current_time - self.hit_timer) < 200:
