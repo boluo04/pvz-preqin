@@ -93,7 +93,11 @@ class Bullet(pg.sprite.Sprite):
             rect = frame_list[0].get_rect()
             width, height = rect.w, rect.h
 
-        if name in {c.BULLET_CROSSBOW_NORMAL, c.BULLET_CROSSBOW_FIRE}:
+        if name in {
+            c.BULLET_CROSSBOW_NORMAL,
+            c.BULLET_CROSSBOW_FIRE,
+            c.BULLET_CROSSBOW_ENCHANT,
+        }:
             scale = 1.5
 
         for frame in frame_list:
@@ -537,8 +541,8 @@ class PeaShooter(Plant):
 
     def attacking(self):
         if self.shoot_timer == 0:
-            self.shoot_timer = self.current_time - 700
-        elif (self.current_time - self.shoot_timer) >= 1400:
+            self.shoot_timer = self.current_time - 500
+        elif (self.current_time - self.shoot_timer) >= 1200:
             self.bullet_group.add(
                 Bullet(
                     self.rect.right - 15,
@@ -556,7 +560,7 @@ class PeaShooter(Plant):
     def setAttack(self):
         self.state = c.ATTACK
         if self.shoot_timer != 0:
-            self.shoot_timer = self.current_time - 700
+            self.shoot_timer = self.current_time - 1000
 
 
 class QinCrossbowShooter(Plant):
@@ -592,8 +596,9 @@ class QinCrossbowShooter(Plant):
 
     def attacking(self):
         if self.shoot_timer == 0:
-            self.shoot_timer = self.current_time - 700
-        elif (self.current_time - self.shoot_timer) >= 1400:
+            # 进入攻击状态后尽快首发，保证体感明显快于豌豆射手
+            self.shoot_timer = self.current_time - 1000
+        if (self.current_time - self.shoot_timer) >= 1000:
             self.bullet_group.add(
                 Bullet(
                     self.rect.right - 15,
@@ -766,8 +771,9 @@ class WallNut(Plant):
         cracked1_frames_name = self.name + '_cracked1'
         cracked2_frames_name = self.name + '_cracked2'
 
-        self.loadFrames(self.cracked1_frames, cracked1_frames_name, 0.14)
-        self.loadFrames(self.cracked2_frames, cracked2_frames_name, 0.14)
+        # 普通坚果裂损帧与本体保持同一缩放，避免切换后看起来像“消失”
+        self.loadFrames(self.cracked1_frames, cracked1_frames_name)
+        self.loadFrames(self.cracked2_frames, cracked2_frames_name)
 
     def idling(self):
         if (not self.cracked1) and self.health <= c.WALLNUT_CRACKED1_HEALTH:
@@ -1064,6 +1070,49 @@ class PotatoMine(Plant):
             self.start_boom = True
         elif (self.current_time - self.bomb_timer) > 500:
             self.health = 0
+
+
+class LuoWangPotatoMine(PotatoMine):
+    def __init__(self, x, y):
+        Plant.__init__(self, x, y, c.LUOWANG_POTATOMINE, c.PLANT_HEALTH, None)
+        self.orig_pos = (x, y)
+        self.animate_interval = 300
+        self.is_init = True
+        self.init_timer = 0
+        self.bomb_timer = 0
+        self.explode_x_range = c.GRID_X_SIZE / 2
+        self.start_boom = False
+        self.boomed = False
+
+    def loadImages(self, name, scale):
+        self.init_frames = []
+        self.idle_frames = []
+        self.explode_frames = []
+
+        init_name = name + 'Init'
+        idle_name = name
+        explode_name = name + 'Explode'
+
+        # 按需求进行分状态缩放：
+        # - 刚种下：当前的 2 倍（由 0.33 -> 0.66）
+        # - 长大后：当前的 1.3 倍
+        # - 爆炸态：保持当前
+        self.loadFrames(self.init_frames, init_name, 0.66)
+        self.loadFrames(self.idle_frames, idle_name, 1.3)
+        self.loadFrames(self.explode_frames, explode_name, 1)
+
+        self.frames = self.init_frames
+
+    def changeFrames(self, frames):
+        """状态切换时保持格子锚点，避免缩放变化导致横向偏移。"""
+        self.frames = frames
+        self.frame_num = len(self.frames)
+        self.frame_index = 0
+        self.image = self.frames[self.frame_index]
+        self.mask = pg.mask.from_surface(self.image)
+        self.rect = self.image.get_rect()
+        self.rect.centerx = self.orig_pos[0]
+        self.rect.bottom = self.orig_pos[1]
 
 
 class Squash(Plant):
@@ -1680,6 +1729,66 @@ class TorchWood(Plant):
                 i.kill()
 
 
+class HeiBingTorchWood(Plant):
+    """
+    黑冰台树桩：将穿过的豌豆/弩箭统一附魔为紫焰版本，并附带冰减速。
+    说明：不要求僵尸新增受伤/死亡素材，仅使用子弹特效与现有减速机制。
+    """
+
+    def __init__(self, x, y, bullet_group):
+        Plant.__init__(
+            self,
+            x,
+            y,
+            c.HEIBING_TORCHWOOD,
+            c.PLANT_HEALTH,
+            bullet_group,
+            scale=0.24,
+        )
+        self.attack_check = c.CHECK_ATTACK_NEVER
+
+    def idling(self):
+        for i in self.bullet_group:
+            # 附魔所有豌豆（普通/冰/火球）
+            if (
+                i.name in {c.BULLET_PEA, c.BULLET_PEA_ICE, c.BULLET_FIREBALL}
+                and i.passed_torchwood_x != self.rect.centerx
+                and abs(i.rect.centerx - self.rect.centerx) <= 20
+            ):
+                self.bullet_group.add(
+                    Bullet(
+                        i.rect.x,
+                        i.rect.y,
+                        i.dest_y,
+                        c.BULLET_PEA_ENCHANT,
+                        c.BULLET_DAMAGE_PEA_ENCHANT_BODY,
+                        effect=c.BULLET_EFFECT_ICE,
+                        passed_torchwood_x=self.rect.centerx,
+                    )
+                )
+                i.kill()
+                continue
+
+            # 附魔所有弩箭（普通/火焰）
+            if (
+                i.name in {c.BULLET_CROSSBOW_NORMAL, c.BULLET_CROSSBOW_FIRE}
+                and i.passed_torchwood_x != self.rect.centerx
+                and abs(i.rect.centerx - self.rect.centerx) <= 20
+            ):
+                self.bullet_group.add(
+                    Bullet(
+                        i.rect.x,
+                        i.rect.y,
+                        i.dest_y,
+                        c.BULLET_CROSSBOW_ENCHANT,
+                        c.BULLET_DAMAGE_CROSSBOW_ENCHANT_BODY,
+                        effect=c.BULLET_EFFECT_ICE,
+                        passed_torchwood_x=self.rect.centerx,
+                    )
+                )
+                i.kill()
+
+
 class StarFruit(Plant):
     def __init__(self, x, y, bullet_group, level):
         Plant.__init__(self, x, y, c.STARFRUIT, c.PLANT_HEALTH, bullet_group)
@@ -2251,6 +2360,161 @@ class FumeShroom(Plant):
             self.image.set_alpha(192)
         else:
             self.image.set_alpha(255)
+
+
+class MoFumeShroom(FumeShroom):
+    METAL_ARMOR_ZOMBIES = {
+        c.BUCKETHEAD_ZOMBIE,
+        c.BUCKETHEAD_DUCKY_TUBE_ZOMBIE,
+        c.SCREEN_DOOR_ZOMBIE,
+    }
+
+    def __init__(self, x, y, bullet_group, zombie_groups):
+        Plant.__init__(self, x, y, c.MOFUMESHROOM, c.WALLNUT_HEALTH, bullet_group)
+        self.shoot_timer = 0
+        self.show_attack_frames = True
+        self.zombie_groups = zombie_groups
+        self.absorbed_armor_icon = None
+        self.absorbed_armor_time = 0
+        self.absorb_fly_start_time = 0
+        self.absorb_fly_from = None
+        self.absorb_fly_duration = 420
+
+    def _iterAllZombies(self):
+        for group in self.zombie_groups:
+            for target in group:
+                if target.state != c.DIE:
+                    yield target
+
+    def _isInLawnArea(self, zombie):
+        lawn_left = c.MAP_OFFSET_X
+        lawn_right = c.MAP_OFFSET_X + c.GRID_X_LEN * c.GRID_X_SIZE
+        return lawn_left <= zombie.rect.centerx <= lawn_right
+
+    def _iterZombieTargets(self):
+        for target in self._iterAllZombies():
+            if target.name not in self.METAL_ARMOR_ZOMBIES:
+                continue
+            # 仅吸取已进入草坪且玩家可见的目标，避免吸到场外僵尸。
+            if not self._isInLawnArea(target):
+                continue
+            if target.rect.left > c.SCREEN_WIDTH or target.rect.right < 0:
+                continue
+            if target.helmet_health > 0 or target.helmet_type2_health > 0:
+                yield target
+
+    def _buildArmorIcon(self, zombie):
+        source_frames = tool.GFX.get(zombie.name)
+        if source_frames:
+            armor_img = source_frames[0].copy()
+        else:
+            armor_img = zombie.image.copy()
+
+        bbox = armor_img.get_bounding_rect(min_alpha=1)
+        if bbox.width <= 0 or bbox.height <= 0:
+            return None
+        armor_img = armor_img.subsurface(bbox).copy()
+        icon_w = 34
+        icon_h = max(
+            1, int(armor_img.get_height() * (icon_w / max(1, armor_img.get_width())))
+        )
+        return pg.transform.smoothscale(armor_img, (icon_w, icon_h))
+
+    def _removeZombieByAbsorb(self, zombie):
+        # 整只僵尸被吸走：立即从当前精灵组移除，不在原地保留普通僵尸。
+        zombie.health = 0
+        zombie.state = c.DIE
+        zombie.kill()
+
+    def _tryAbsorbArmor(self):
+        if self.absorbed_armor_icon is not None:
+            if (
+                self.current_time - self.absorbed_armor_time
+                >= c.MOFUMESHROOM_ABSORB_INTERVAL
+            ):
+                self.absorbed_armor_icon = None
+                self.absorbed_armor_time = 0
+                self.absorb_fly_start_time = 0
+                self.absorb_fly_from = None
+            return
+
+        candidates = []
+        for zombie in self._iterZombieTargets():
+            dx = zombie.rect.centerx - self.rect.centerx
+            dy = zombie.rect.centery - self.rect.centery
+            candidates.append((dx * dx + dy * dy, zombie))
+        if not candidates:
+            return
+
+        _, target = min(candidates, key=lambda item: item[0])
+        self.absorbed_armor_icon = self._buildArmorIcon(target)
+        self._removeZombieByAbsorb(target)
+        self.absorbed_armor_time = self.current_time
+        self.absorb_fly_start_time = self.current_time
+        self.absorb_fly_from = target.rect.center
+
+    def idling(self):
+        self._tryAbsorbArmor()
+
+    def attacking(self):
+        self._tryAbsorbArmor()
+        if self.shoot_timer == 0:
+            self.shoot_timer = self.current_time - 700
+        elif self.current_time - self.shoot_timer >= 1100:
+            if self.show_attack_frames:
+                self.show_attack_frames = False
+                self.changeFrames(self.attack_frames)
+
+        if self.current_time - self.shoot_timer >= 1400:
+            self.bullet_group.add(Fume(self.rect.right - 35, self.rect.y))
+            for target_zombie in self._iterAllZombies():
+                if abs(target_zombie.rect.centery - self.rect.centery) > (
+                    c.GRID_Y_SIZE // 2
+                ):
+                    continue
+                if self.canAttack(target_zombie):
+                    target_zombie.setDamage(
+                        c.MOFUMESHROOM_DAMAGE,
+                        damage_type=c.ZOMBIE_RANGE_DAMAGE,
+                    )
+            self.shoot_timer = self.current_time
+            self.show_attack_frames = True
+            c.SOUND_FUME.play()
+
+    def animation(self):
+        super().animation()
+        if self.absorbed_armor_icon is not None:
+            self.image = self.image.copy()
+            icon = self.absorbed_armor_icon
+            icon_rect = icon.get_rect()
+            target_x = self.image.get_width() - icon_rect.width - 2
+            target_y = 2
+
+            # 过渡期内做“吸附飞行”效果，之后固定在右上角
+            if (
+                self.absorb_fly_start_time > 0
+                and self.current_time - self.absorb_fly_start_time
+                < self.absorb_fly_duration
+                and self.absorb_fly_from is not None
+            ):
+                t = (
+                    self.current_time - self.absorb_fly_start_time
+                ) / self.absorb_fly_duration
+                start_local_x = self.absorb_fly_from[0] - self.rect.x - icon_rect.width // 2
+                start_local_y = self.absorb_fly_from[1] - self.rect.y - icon_rect.height // 2
+                cur_x = int(start_local_x + (target_x - start_local_x) * t)
+                cur_y = int(start_local_y + (target_y - start_local_y) * t)
+                min_scale = 0.45
+                cur_scale = max(min_scale, 1 - 0.55 * t)
+                fly_w = max(1, int(icon.get_width() * cur_scale))
+                fly_h = max(1, int(icon.get_height() * cur_scale))
+                fly_icon = pg.transform.smoothscale(icon, (fly_w, fly_h))
+                self.image.blit(fly_icon, (cur_x, cur_y))
+            else:
+                icon_rect.left = target_x
+                icon_rect.top = target_y
+                self.image.blit(icon, icon_rect)
+            self.mask = pg.mask.from_surface(self.image)
 
 
 class IceFrozenPlot(Plant):

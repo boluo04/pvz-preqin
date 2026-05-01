@@ -66,6 +66,8 @@ class Zombie(pg.sprite.Sprite):
         self.hit_timer = 0
         self.speed = 1
         self.freeze_timer = 0
+        self.freeze_duration_override = None
+        self.freeze_no_post_slow = False
         self.losthead_timer = 0
         self.is_hypno = False  # the zombie is hypo and attack other zombies when it ate a HypnoShroom
 
@@ -301,15 +303,19 @@ class Zombie(pg.sprite.Sprite):
             if self.checkToDie(self.losthead_attack_frames):
                 return
 
-        if (
-            self.current_time - self.freeze_timer
-        ) >= c.MIN_FREEZE_TIME + random.randint(0, 2000):
+        freeze_duration = self.freeze_duration_override
+        if freeze_duration is None:
+            freeze_duration = c.MIN_FREEZE_TIME + random.randint(0, 2000)
+        if (self.current_time - self.freeze_timer) >= freeze_duration:
             self.setWalk()
-            # 注意寒冰菇解冻后还有减速
-            self.ice_slow_timer = (
-                self.freeze_timer + 10000
-            )   # 每次冰冻冻结 + 减速时间为20 s，而减速有10 s计时，故这里+10 s
-            self.ice_slow_ratio = 2
+            if self.freeze_no_post_slow:
+                self.ice_slow_ratio = 1
+            else:
+                # 注意寒冰菇解冻后还有减速，时长与ICE_SLOW_TIME一致
+                self.ice_slow_timer = self.freeze_timer + c.ICE_SLOW_TIME
+                self.ice_slow_ratio = 2.5
+            self.freeze_duration_override = None
+            self.freeze_no_post_slow = False
 
     def setLostHead(self):
         self.losthead_timer = self.current_time
@@ -353,6 +359,10 @@ class Zombie(pg.sprite.Sprite):
         self.image = self.frames[self.frame_index]
         if self.is_hypno:
             self.image = pg.transform.flip(self.image, True, False)
+        if self.ice_slow_ratio > 1:
+            # 冰减速状态加明显冷色染色，提升小窗口可读性
+            self.image = self.image.copy()
+            self.image.fill((170, 210, 255, 255), special_flags=pg.BLEND_RGBA_MULT)
         self.mask = pg.mask.from_surface(self.image)
         if (self.current_time - self.hit_timer) >= 200:
             self.image.set_alpha(255)
@@ -374,7 +384,7 @@ class Zombie(pg.sprite.Sprite):
 
         # when get a ice bullet damage, slow the attack or walk speed of the zombie
         self.ice_slow_timer = self.current_time
-        self.ice_slow_ratio = 2
+        self.ice_slow_ratio = 2.5
 
     def updateIceSlow(self):
         if self.ice_slow_ratio > 1:
@@ -541,10 +551,18 @@ class Zombie(pg.sprite.Sprite):
         self.old_state = self.state
         self.state = c.FREEZE
         self.freeze_timer = self.current_time
+        self.freeze_duration_override = None
+        self.freeze_no_post_slow = False
         self.ice_trap_image = ice_trap_image
         self.ice_trap_rect = ice_trap_image.get_rect()
         self.ice_trap_rect.centerx = self.rect.centerx
         self.ice_trap_rect.bottom = self.rect.bottom
+
+    def setFreezePause(self, ice_trap_image, duration_ms):
+        """Freeze for a fixed duration and recover immediately (no post-slow)."""
+        self.setFreeze(ice_trap_image)
+        self.freeze_duration_override = duration_ms
+        self.freeze_no_post_slow = True
 
     def drawFreezeTrap(self, surface):
         if self.state == c.FREEZE:
@@ -1310,11 +1328,13 @@ class PoleVaultingZombie(Zombie):
         # 起跳但是没有落地时不设置冰冻
         if self.jumping and (not self.jumped):
             self.ice_slow_timer = self.current_time
-            self.ice_slow_ratio = 2
+            self.ice_slow_ratio = 2.5
         else:
             self.freeze_timer = self.current_time
             self.old_state = self.state
             self.state = c.FREEZE
+            self.freeze_duration_override = None
+            self.freeze_no_post_slow = False
             self.ice_trap_image = ice_trap_image
             self.ice_trap_rect = ice_trap_image.get_rect()
             self.ice_trap_rect.centerx = self.rect.centerx

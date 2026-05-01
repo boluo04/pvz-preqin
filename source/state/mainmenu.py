@@ -4,6 +4,7 @@ import pygame as pg
 
 from .. import constants as c
 from .. import tool
+from ..component import map
 
 
 class Menu(tool.State):
@@ -17,6 +18,7 @@ class Menu(tool.State):
         self.setupBackground()
         self.setupOptions()
         self.setupOptionMenu()
+        self.setupLevelSelectMenu()
         self.setupSunflowerTrophy()
         pg.mixer.music.stop()
         pg.mixer.music.load(os.path.join(c.PATH_MUSIC_DIR, 'intro.opus'))
@@ -114,6 +116,7 @@ class Menu(tool.State):
         self.adventure_timer = 0
         self.adventure_clicked = False
         self.option_button_clicked = False
+        self.level_select_clicked = False
 
     def checkHilight(self, x: int, y: int):
         # 高亮冒险模式按钮
@@ -157,13 +160,8 @@ class Menu(tool.State):
         return frames[index]
 
     def respondAdventureClick(self):
-        self.adventure_clicked = True
-        self.adventure_timer = self.adventure_start = self.current_time
-        self.persist[c.GAME_MODE] = c.MODE_ADVENTURE
-        # 播放进入音效
-        pg.mixer.music.stop()
-        c.SOUND_EVILLAUGH.play()
-        c.SOUND_LOSE.play()
+        self.level_select_clicked = True
+        c.SOUND_BUTTON_CLICK.play()
 
     # 按到小游戏
     def respondLittleGameClick(self):
@@ -241,6 +239,55 @@ class Menu(tool.State):
         self.sound_volume_minus_button_rect.y = (
             self.sound_volume_plus_button_rect.y
         ) = 250
+
+    def setupLevelSelectMenu(self):
+        self.level_select_menu = pg.Surface((700, 460))
+        self.level_select_menu.set_alpha(240)
+        self.level_select_menu.fill((40, 44, 52))
+        self.level_select_menu_rect = self.level_select_menu.get_rect()
+        self.level_select_menu_rect.center = (400, 300)
+
+        font_title = pg.font.Font(c.FONT_PATH, 34)
+        self.level_select_title = font_title.render(
+            '选择关卡（冒险模式）', True, c.LIGHTYELLOW
+        )
+        self.level_select_title_rect = self.level_select_title.get_rect()
+        self.level_select_title_rect.x = self.level_select_menu_rect.x + 25
+        self.level_select_title_rect.y = self.level_select_menu_rect.y + 18
+
+        # 关闭按钮
+        self.level_select_close_rect = pg.Rect(0, 0, 90, 40)
+        self.level_select_close_rect.right = self.level_select_menu_rect.right - 20
+        self.level_select_close_rect.y = self.level_select_menu_rect.y + 20
+
+        # 关卡按钮网格（最多显示24个，足够白天/黑夜/泳池调试）
+        self.level_button_items = []
+        font_btn = pg.font.Font(c.FONT_PATH, 18)
+        start_x = self.level_select_menu_rect.x + 24
+        start_y = self.level_select_menu_rect.y + 78
+        col_count = 4
+        btn_w, btn_h = 158, 52
+        pad_x, pad_y = 10, 10
+        max_show = min(24, map.TOTAL_LEVEL)
+        for i in range(max_show):
+            row, col = divmod(i, col_count)
+            rect = pg.Rect(
+                start_x + col * (btn_w + pad_x),
+                start_y + row * (btn_h + pad_y),
+                btn_w,
+                btn_h,
+            )
+            title = map.LEVEL_MAP_DATA[i][c.GAME_TITLE]
+            text = font_btn.render(f'{i:02d} {title}', True, c.BLACK)
+            self.level_button_items.append((i, rect, text))
+
+    def respondLevelSelectClick(self, level_index: int):
+        self.persist[c.GAME_MODE] = c.MODE_ADVENTURE
+        self.persist[c.LEVEL_NUM] = level_index
+        self.done = True
+        self.level_select_clicked = False
+        # 直接进入关卡，复用点击音效
+        c.SOUND_BUTTON_CLICK.play()
 
     def setupSunflowerTrophy(self):
         # 设置金银向日葵图片信息
@@ -375,6 +422,43 @@ class Menu(tool.State):
                         i.set_volume(self.game_info[c.SOUND_VOLUME])
                     c.SOUND_BUTTON_CLICK.play()
                     self.saveUserData()
+        elif self.level_select_clicked:
+            # 半透明遮罩
+            shade = pg.Surface((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
+            shade.set_alpha(120)
+            shade.fill(c.BLACK)
+            surface.blit(shade, (0, 0))
+
+            # 面板与标题
+            surface.blit(self.level_select_menu, self.level_select_menu_rect)
+            surface.blit(self.level_select_title, self.level_select_title_rect)
+
+            # 关闭按钮
+            pg.draw.rect(surface, c.LIGHTGRAY, self.level_select_close_rect)
+            font_close = pg.font.Font(c.FONT_PATH, 20)
+            close_text = font_close.render('关闭', True, c.BLACK)
+            close_text_rect = close_text.get_rect(center=self.level_select_close_rect.center)
+            surface.blit(close_text, close_text_rect)
+
+            # 关卡按钮
+            for level_index, rect, text in self.level_button_items:
+                color = c.PARCHMENT_YELLOW
+                if self.inArea(rect, *pg.mouse.get_pos()):
+                    color = c.LIGHTYELLOW
+                pg.draw.rect(surface, color, rect)
+                pg.draw.rect(surface, c.BLACK, rect, 2)
+                text_rect = text.get_rect(center=rect.center)
+                surface.blit(text, text_rect)
+
+            if mouse_pos:
+                if self.inArea(self.level_select_close_rect, *mouse_pos):
+                    self.level_select_clicked = False
+                    c.SOUND_BUTTON_CLICK.play()
+                else:
+                    for level_index, rect, _ in self.level_button_items:
+                        if self.inArea(rect, *mouse_pos):
+                            self.respondLevelSelectClick(level_index)
+                            break
         # 没有点到前两者时常规行检测所有按钮的点击和高亮
         else:
             # 先检查选项高亮预览

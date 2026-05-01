@@ -474,7 +474,7 @@ class Level(tool.State):
         self.state = c.CHOOSE
         self.panel = menubar.Panel(
             c.CARDS_TO_CHOOSE,
-            1000,
+            3000,
             self.background_type,
         )
 
@@ -510,7 +510,7 @@ class Level(tool.State):
 
         self.state = c.PLAY
         if self.bar_type == c.CHOOSEBAR_STATIC:
-            self.menubar = menubar.MenuBar(card_list, 1000)
+            self.menubar = menubar.MenuBar(card_list, 3000)
         else:
             self.menubar = menubar.MoveBar(card_list)
 
@@ -1198,6 +1198,8 @@ class Level(tool.State):
                 new_plant = plant.PuffShroom(x, y, self.bullet_groups[map_y])
             case c.POTATOMINE:
                 new_plant = plant.PotatoMine(x, y)
+            case c.LUOWANG_POTATOMINE:
+                new_plant = plant.LuoWangPotatoMine(x, y)
             case c.SQUASH:
                 new_plant = plant.Squash(
                     x, y, self.map.map[map_y][map_x][c.MAP_PLANT]
@@ -1224,6 +1226,10 @@ class Level(tool.State):
                 new_plant = plant.LilyPad(x, y)
             case c.TORCHWOOD:
                 new_plant = plant.TorchWood(x, y, self.bullet_groups[map_y])
+            case c.HEIBING_TORCHWOOD:
+                new_plant = plant.HeiBingTorchWood(
+                    x, y, self.bullet_groups[map_y]
+                )
             case c.STARFRUIT:
                 new_plant = plant.StarFruit(
                     x, y, self.bullet_groups[map_y], self
@@ -1265,6 +1271,10 @@ class Level(tool.State):
             case c.FUMESHROOM:
                 new_plant = plant.FumeShroom(
                     x, y, self.bullet_groups[map_y], self.zombie_groups[map_y]
+                )
+            case c.MOFUMESHROOM:
+                new_plant = plant.MoFumeShroom(
+                    x, y, self.bullet_groups[map_y], self.zombie_groups
                 )
             case c.GARLIC:
                 new_plant = plant.Garlic(x, y)
@@ -1350,6 +1360,8 @@ class Level(tool.State):
             scale = 0.15
         elif plant_name == c.BINGYONG_WALLNUT:
             scale = 0.14
+        elif plant_name == c.HEIBING_TORCHWOOD:
+            scale = 0.24
 
         self.mouse_image = tool.get_image(
             frame_list[0], x, y, width, height, colorkey, scale
@@ -1392,26 +1404,36 @@ class Level(tool.State):
                                     damage_type=bullet.damage_type,
                                 )
                                 bullet.setExplode()
-                                # 火球有溅射伤害
+                                # 溅射伤害（火球/火弩箭/附魔豌豆/附魔弩箭）
                                 if bullet.name in {
                                     c.BULLET_FIREBALL,
                                     c.BULLET_CROSSBOW_FIRE,
+                                    c.BULLET_PEA_ENCHANT,
+                                    c.BULLET_CROSSBOW_ENCHANT,
                                 }:
                                     if bullet.name == c.BULLET_FIREBALL:
-                                        splash_damage = (
-                                            c.BULLET_DAMAGE_FIREBALL_RANGE
-                                        )
+                                        splash_damage = c.BULLET_DAMAGE_FIREBALL_RANGE
+                                    elif bullet.name == c.BULLET_CROSSBOW_FIRE:
+                                        splash_damage = c.BULLET_DAMAGE_CROSSBOW_FIRE_RANGE
+                                    elif bullet.name == c.BULLET_PEA_ENCHANT:
+                                        splash_damage = c.BULLET_DAMAGE_PEA_ENCHANT_RANGE
                                     else:
-                                        splash_damage = (
-                                            c.BULLET_DAMAGE_CROSSBOW_FIRE_RANGE
-                                        )
+                                        splash_damage = c.BULLET_DAMAGE_CROSSBOW_ENCHANT_RANGE
+                                    splash_effect = None
+                                    if bullet.name in {
+                                        c.BULLET_PEA_ENCHANT,
+                                        c.BULLET_CROSSBOW_ENCHANT,
+                                    }:
+                                        # 附魔弹体的溅射也附带减速，保证效果可感知
+                                        splash_effect = c.BULLET_EFFECT_ICE
+
                                     for rangeZombie in self.zombie_groups[i]:
                                         if abs(
                                             rangeZombie.rect.x - bullet.rect.x
                                         ) <= (c.GRID_X_SIZE // 2):
                                             rangeZombie.setDamage(
                                                 splash_damage,
-                                                effect=None,
+                                                effect=splash_effect,
                                                 damage_type=c.ZOMBIE_DEAFULT_DAMAGE,
                                             )
                                 break
@@ -1732,6 +1754,27 @@ class Level(tool.State):
                     20, damage_type=c.ZOMBIE_RANGE_DAMAGE
                 )    # 寒冰菇还有全场20的伤害
 
+    def freezeZombiesNineGridPause(self, map_x, map_y, duration_ms):
+        """Freeze zombies in 3x3 tiles around center and recover with no post-slow."""
+        targets = {
+            (map_x + dx, map_y + dy)
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+        }
+        trap_frames = tool.GFX.get(c.ICETRAP)
+        if trap_frames:
+            ice_trap = trap_frames[0]
+        else:
+            # 资源缺失时使用透明占位图，避免KeyError导致卡退
+            ice_trap = pg.Surface((1, 1), pg.SRCALPHA)
+        for i in range(self.map_y_len):
+            for zombie in self.zombie_groups[i]:
+                zombie_map_x, zombie_map_y = self.map.getMapIndex(
+                    zombie.rect.centerx, zombie.rect.bottom
+                )
+                if (zombie_map_x, zombie_map_y) in targets:
+                    zombie.setFreezePause(ice_trap, duration_ms)
+
     def killPlant(self, target_plant, shovel=False):
         x, y = target_plant.getPosition()
         map_x, map_y = self.map.getMapIndex(x, y)
@@ -1830,21 +1873,33 @@ class Level(tool.State):
                 if target_plant.canAttack(zombie):
                     target_plant.setAttack(zombie, self.zombie_groups[i])
                     break
-        elif target_plant.name == c.POTATOMINE:
+        elif target_plant.name in {c.POTATOMINE, c.LUOWANG_POTATOMINE}:
             for zombie in self.zombie_groups[i]:
                 if target_plant.canAttack(zombie):
                     target_plant.setAttack()
                     break
             if target_plant.start_boom and (not target_plant.boomed):
+                map_x, map_y = self.map.getMapIndex(
+                    target_plant.rect.centerx, target_plant.rect.bottom
+                )
                 for zombie in self.zombie_groups[i]:
                     # 双判断：发生碰撞或在攻击范围内
                     if (pg.sprite.collide_mask(zombie, target_plant)) or (
                         abs(zombie.rect.centerx - target_plant.rect.centerx)
                         <= target_plant.explode_x_range
                     ):
-                        zombie.setDamage(
-                            1800, damage_type=c.ZOMBIE_RANGE_DAMAGE
+                        damage = (
+                            c.LUOWANG_POTATOMINE_DAMAGE
+                            if target_plant.name == c.LUOWANG_POTATOMINE
+                            else 1800
                         )
+                        zombie.setDamage(
+                            damage, damage_type=c.ZOMBIE_RANGE_DAMAGE
+                        )
+                if target_plant.name == c.LUOWANG_POTATOMINE:
+                    self.freezeZombiesNineGridPause(
+                        map_x, map_y, c.LUOWANG_POTATOMINE_FREEZE_MS
+                    )
                 target_plant.boomed = True
         elif target_plant.name == c.SQUASH:
             for zombie in self.zombie_groups[i]:

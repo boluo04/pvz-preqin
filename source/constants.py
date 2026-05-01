@@ -278,7 +278,7 @@ PLANT_CARD_INFO = (  # 元组 (植物名称, 卡片名称, 阳光, 冷却时间)
     (
         QIN_CROSSBOW_SHOOTER := 'QinCrossbowShooter',
         CARD_QIN_CROSSBOW_SHOOTER := 'card_qincrossbowshooter',
-        125,
+        150,
         7500,
     ),
     (SUNFLOWER := 'SunFlower', CARD_SUNFLOWER := 'card_sunflower', 50, 7500),
@@ -308,6 +308,12 @@ PLANT_CARD_INFO = (  # 元组 (植物名称, 卡片名称, 阳光, 冷却时间)
         30000,
     ),
     (
+        LUOWANG_POTATOMINE := 'LuoWangPotatoMine',
+        CARD_LUOWANG_POTATOMINE := 'card_luowangpotatomine',
+        50,
+        30000,
+    ),
+    (
         SNOWPEASHOOTER := 'SnowPea',
         CARD_SNOWPEASHOOTER := 'card_snowpea',
         175,
@@ -331,6 +337,12 @@ PLANT_CARD_INFO = (  # 元组 (植物名称, 卡片名称, 阳光, 冷却时间)
         FUMESHROOM := 'FumeShroom',
         CARD_FUMESHROOM := 'card_fumeshroom',
         75,
+        7500,
+    ),
+    (
+        MOFUMESHROOM := 'MoFumeShroom',
+        CARD_MOFUMESHROOM := 'card_mofumeshroom',
+        225,
         7500,
     ),
     (
@@ -375,6 +387,12 @@ PLANT_CARD_INFO = (  # 元组 (植物名称, 卡片名称, 阳光, 冷却时间)
     (JALAPENO := 'Jalapeno', CARD_JALAPENO := 'card_jalapeno', 125, 50000),
     (SPIKEWEED := 'Spikeweed', CARD_SPIKEWEED := 'card_spikeweed', 100, 7500),
     (TORCHWOOD := 'TorchWood', CARD_TORCHWOOD := 'card_torchwood', 175, 7500),
+    (
+        HEIBING_TORCHWOOD := 'HeiBingTorchWood',
+        CARD_HEIBING_TORCHWOOD := 'card_heibingtorchwood',
+        350,
+        7500,
+    ),
     (TALLNUT := 'TallNut', CARD_TALLNUT := 'card_tallnut', 125, 30000),
     (SEASHROOM := 'SeaShroom', CARD_SEASHROOM := 'card_seashroom', 0, 30000),
     (STARFRUIT := 'StarFruit', CARD_STARFRUIT := 'card_starfruit', 125, 7500),
@@ -485,6 +503,7 @@ CAN_SLEEP_PLANTS = {
     PUFFSHROOM,
     SUNSHROOM,
     FUMESHROOM,
+    MOFUMESHROOM,
     HYPNOSHROOM,
     SCAREDYSHROOM,
     ICESHROOM,
@@ -502,7 +521,7 @@ PLANT_HEALTH = 300
 WALLNUT_HEALTH = 4000
 WALLNUT_CRACKED1_HEALTH = WALLNUT_HEALTH // 3 * 2
 WALLNUT_CRACKED2_HEALTH = WALLNUT_HEALTH // 3
-BINGYONG_WALLNUT_HEALTH = WALLNUT_HEALTH * 2
+BINGYONG_WALLNUT_HEALTH = int(WALLNUT_HEALTH * 1.5)
 BINGYONG_WALLNUT_CRACKED1_HEALTH = BINGYONG_WALLNUT_HEALTH // 3 * 2
 BINGYONG_WALLNUT_CRACKED2_HEALTH = BINGYONG_WALLNUT_HEALTH // 3
 BINGYONG_WALLNUT_DEATH_DAMAGE = 900   # 樱桃炸弹(1800)的一半
@@ -521,8 +540,16 @@ FLOWER_SUN_INTERVAL = 24000
 SUN_LIVE_TIME = 10000
 SUN_VALUE = 25
 
+# 落网土豆雷
+LUOWANG_POTATOMINE_DAMAGE = 2250
+LUOWANG_POTATOMINE_FREEZE_MS = 5000
+
+# 墨磁菇
+MOFUMESHROOM_DAMAGE = 30
+MOFUMESHROOM_ABSORB_INTERVAL = 45000
+
 # 僵尸冷冻
-ICE_SLOW_TIME = 10000
+ICE_SLOW_TIME = 5000
 MIN_FREEZE_TIME = 4000
 ICETRAP = 'IceTrap'
 
@@ -533,6 +560,8 @@ BULLET_PEA_ICE = 'PeaIce'
 BULLET_FIREBALL = 'Fireball'
 BULLET_CROSSBOW_NORMAL = 'CrossbowNormal'
 BULLET_CROSSBOW_FIRE = 'CrossbowFire'
+BULLET_PEA_ENCHANT = 'PeaEnchant'
+BULLET_CROSSBOW_ENCHANT = 'CrossbowEnchant'
 BULLET_MUSHROOM = 'BulletMushRoom'
 BULLET_SEASHROOM = 'BulletSeaShroom'
 FUME = 'Fume'
@@ -542,8 +571,12 @@ BULLET_DAMAGE_FIREBALL_BODY = 27   # 这是火球本体的伤害，注意不是4
 BULLET_DAMAGE_FIREBALL_RANGE = 13   # 原版溅射伤害会随着僵尸数量增多而减少，这里相当于做了一个增强
 # 秦弩射手伤害（相对豌豆加强）
 BULLET_DAMAGE_CROSSBOW_NORMAL = 30   # 普通豌豆(20)的1.5倍
-BULLET_DAMAGE_CROSSBOW_FIRE_BODY = 54   # 火豌豆本体(27)的2倍
-BULLET_DAMAGE_CROSSBOW_FIRE_RANGE = 26   # 火豌豆溅射(13)的2倍
+BULLET_DAMAGE_CROSSBOW_FIRE_BODY = 45
+BULLET_DAMAGE_CROSSBOW_FIRE_RANGE = 20
+BULLET_DAMAGE_PEA_ENCHANT_BODY = 45
+BULLET_DAMAGE_PEA_ENCHANT_RANGE = 20
+BULLET_DAMAGE_CROSSBOW_ENCHANT_BODY = 68
+BULLET_DAMAGE_CROSSBOW_ENCHANT_RANGE = 33
 # 子弹效果
 BULLET_EFFECT_ICE = 'ice'
 BULLET_EFFECT_UNICE = 'unice'
@@ -565,6 +598,8 @@ BULLET_INDEPENDENT_BOOM_IMG = {
     BULLET_PEA_ICE,
     BULLET_CROSSBOW_NORMAL,
     BULLET_CROSSBOW_FIRE,
+    BULLET_PEA_ENCHANT,
+    BULLET_CROSSBOW_ENCHANT,
     BULLET_MUSHROOM,
     BULLET_SEASHROOM,
     BULLET_STAR,
